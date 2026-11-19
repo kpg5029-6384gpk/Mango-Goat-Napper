@@ -21,7 +21,7 @@ final class Smoke {
   }
   if(mc.player==null || mc.level==null)return;
   worldTicks++;
-  if(worldTicks==30) { mc.gui.setScreen(null); inject(0); }
+  if(worldTicks==30) { mc.gui.setScreen(null); inject(0); if(Boolean.getBoolean("mangogoatnapper.underground")) { var server=mc.getSingleplayerServer(); var id=mc.player.getUUID(); server.execute(()->testArena(server,id)); } }
   if(worldTicks==60) inject(1);
   if(goatSeen && MangoGoatNapper.testPhase()==1 && !Boolean.getBoolean("mangogoatnapper.elevated")) {
    chaseTicks++;
@@ -56,13 +56,14 @@ final class Smoke {
    server.execute(()->{
     var p=server.getPlayerList().getPlayer(id); if(p==null)return;
     int phase=MangoGoatNapper.testPhase();
-    if(phase==1 && !goatSeen) { if(!MangoGoatNapper.testGoatHarmless())throw new AssertionError("Goat must have visual fire only and zero attack damage"); goatSeen=true; if(Boolean.getBoolean("mangogoatnapper.water")) MangoGoatNapper.testWaterArena(p); else if(Boolean.getBoolean("mangogoatnapper.elevated")) MangoGoatNapper.testElevatedArena(p); else MangoGoatNapper.testBringGoat(p); health=p.getHealth(); x=p.getX(); z=p.getZ(); }
+    if(phase==1 && !goatSeen) { if(!MangoGoatNapper.testGoatHarmless())throw new AssertionError("Goat must have visual fire only and zero attack damage"); goatSeen=true; if(Boolean.getBoolean("mangogoatnapper.water")) MangoGoatNapper.testWaterArena(p); else if(Boolean.getBoolean("mangogoatnapper.elevated")) MangoGoatNapper.testElevatedArena(p); else if(!Boolean.getBoolean("mangogoatnapper.underground")) MangoGoatNapper.testBringGoat(p); health=p.getHealth(); x=p.getX(); z=p.getZ(); }
     if(phase==3 && !abducted) { abducted=true; if(p.getHealth()!=health || p.getRemainingFireTicks()>0)throw new AssertionError("Goat damaged or ignited player"); double distance=Math.hypot(p.getX()-x,p.getZ()-z); if(distance<99 || distance>152)throw new AssertionError("Wrong destination distance "+distance); LogUtils.getLogger().info("GOAT NAPPER SERVER POSE: {}",p.getPose()); }
     else if(abducted && phase==0 && !awakened) { awakened=true; LogUtils.getLogger().info("GOAT NAPPER SMOKE PASSED: spawn, capture, destination, wake");  }
    });
   }
   if(worldTicks>(Boolean.getBoolean("mangogoatnapper.manual")?6000:2400) && !awakened) { LogUtils.getLogger().error("GOAT NAPPER SMOKE FAILED: goatSeen={} abducted={} phase={}",goatSeen,abducted,MangoGoatNapper.testPhase()); mc.stop(); }
  }
+ static void testArena(net.minecraft.server.MinecraftServer server,java.util.UUID id) { var p=server.getPlayerList().getPlayer(id); if(p!=null) MangoGoatNapper.testUndergroundArena(p); }
  static void inject(int seq) {
   var f=new JsonObject(); f.addProperty("session","qa"); f.addProperty("sequence",seq); var events=new JsonArray();
   if(seq>0) { var e=new JsonObject(); e.addProperty("sequence",seq); e.addProperty("created",System.currentTimeMillis()/1000.0); e.addProperty("username","qa_viewer"); e.addProperty("test",true); events.add(e); }

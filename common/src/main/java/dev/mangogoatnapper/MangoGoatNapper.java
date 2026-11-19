@@ -68,6 +68,29 @@ public final class MangoGoatNapper {
      var player=server.getPlayerList().getPlayer(playerId);
      if(player==null || !player.isAlive() || player.level().dimension()!=dimension || phase!=0 || System.currentTimeMillis()<cooldownUntil)return;
      var level=player.level(); var random=ThreadLocalRandom.current();
+     boolean underground=player.getY()<level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,player.blockPosition().getX(),player.blockPosition().getZ())-8;
+     if(underground) {
+      var mob=EntityTypes.GOAT.create(level,EntitySpawnReason.TRIGGERED);
+      if(!(mob instanceof Mob candidate))return;
+      int[] distances={40,30,20,12,8,5};
+      for(int distance:distances) for(int direction=0;direction<32;direction++) {
+       double angle=direction*Math.PI/16;
+       int x=(int)Math.floor(player.getX()+Math.cos(angle)*distance), z=(int)Math.floor(player.getZ()+Math.sin(angle)*distance);
+       if(!level.hasChunk(x>>4,z>>4))continue;
+       for(int offset=0;offset<=16;offset++) {
+        int y=player.blockPosition().getY()+(offset==0?0:(offset%2==1?(offset+1)/2:-offset/2));
+        var pos=new BlockPos(x,y,z);
+        if(!level.getBlockState(pos.below()).isSolid() || !level.getFluidState(pos).isEmpty())continue;
+        candidate.setPos(x+0.5,y,z+0.5);
+        if(!level.noCollision(candidate))continue;
+        candidate.setOnGround(true);
+        var path=candidate.getNavigation().createPath(player,0);
+        if(path==null || !path.canReach())continue;
+        spawnGoat(candidate,playerId,player,level); return;
+       }
+      }
+      player.sendSystemMessage(Component.literal("Goat Napper: no reachable spawn nearby.")); return;
+     }
      for(int i=0;i<24;i++) {
       double angle=random.nextDouble(Math.PI*2), distance=random.nextDouble(30,51);
       int x=(int)Math.floor(player.getX()+Math.cos(angle)*distance), z=(int)Math.floor(player.getZ()+Math.sin(angle)*distance);
@@ -77,17 +100,20 @@ public final class MangoGoatNapper {
       if(!(mob instanceof Mob candidate))return;
       candidate.setPos(x+0.5,y,z+0.5);
       if(!level.noCollision(candidate) || !level.getBlockState(new BlockPos(x,y-1,z)).isSolid())continue;
-      candidate.finalizeSpawn(level,level.getCurrentDifficultyAt(candidate.blockPosition()),EntitySpawnReason.TRIGGERED,null);
-      candidate.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE).setBaseValue(0); candidate.setPermanentlyInvulnerable(true); candidate.setSharedFlagOnFire(true);
-      candidate.setCustomName(Component.literal("The Goat Napper")); candidate.setCustomNameVisible(true);
-      level.addFreshEntity(candidate); goat=candidate; target=playerId; phase=1; ticks=0; cooldownUntil=System.currentTimeMillis()+300000;
-      player.sendSystemMessage(Component.literal("You hear a scream in the distance..."));
+      spawnGoat(candidate,playerId,player,level);
       return;
      }
      player.sendSystemMessage(Component.literal("Goat Napper: no loaded safe spawn nearby."));
     });
    }
   } catch(RuntimeException ignored) { }
+ }
+ private static void spawnGoat(Mob candidate,java.util.UUID playerId,net.minecraft.server.level.ServerPlayer player,net.minecraft.server.level.ServerLevel level) {
+  candidate.finalizeSpawn(level,level.getCurrentDifficultyAt(candidate.blockPosition()),EntitySpawnReason.TRIGGERED,null);
+  candidate.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE).setBaseValue(0); candidate.setPermanentlyInvulnerable(true); candidate.setSharedFlagOnFire(true);
+  candidate.setCustomName(Component.literal("The Goat Napper")); candidate.setCustomNameVisible(true);
+  level.addFreshEntity(candidate); goat=candidate; target=playerId; phase=1; ticks=0; cooldownUntil=System.currentTimeMillis()+300000;
+  player.sendSystemMessage(Component.literal("You hear a scream in the distance..."));
  }
  private static void advance(net.minecraft.server.MinecraftServer server, java.util.UUID playerId) {
   if(phase==0 || !playerId.equals(target))return;
@@ -175,6 +201,14 @@ public final class MangoGoatNapper {
  static int testPhase() { return phase; }
  static boolean testGoatHarmless() { return goat != null && goat.getRemainingFireTicks() <= 0 && goat.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE).getValue() == 0; }
  static void testBringGoat(net.minecraft.server.level.ServerPlayer player) { if(goat!=null)goat.setPos(player.getX(),player.getY(),player.getZ()+3); }
+ static void testUndergroundArena(net.minecraft.server.level.ServerPlayer player) {
+  var level=player.level(); int x=player.blockPosition().getX(), z=player.blockPosition().getZ(), y=40;
+  for(int dx=-45;dx<=45;dx++) for(int dz=-3;dz<=3;dz++) for(int h=0;h<=5;h++) {
+   var block=(h==0 || h==5 || Math.abs(dz)==3)?net.minecraft.world.level.block.Blocks.STONE:net.minecraft.world.level.block.Blocks.AIR;
+   level.setBlockAndUpdate(new BlockPos(x+dx,y+h,z+dz),block.defaultBlockState());
+  }
+  player.teleportTo(x+0.5,y+1,z+0.5);
+ }
  static void testWaterArena(net.minecraft.server.level.ServerPlayer player) {
   var level=player.level(); int x=player.blockPosition().getX(), z=player.blockPosition().getZ(), y=160;
   for(int dx=-20;dx<=20;dx++) for(int dz=-5;dz<=5;dz++) {

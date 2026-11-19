@@ -13,4 +13,4 @@ tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8'; options.
 jar { from('../LICENSE') }
 
 
-loom { runs { client { if (project.hasProperty('mangogoatnapperSmoke')) { vmArg '-Dmangogoatnapper.smoke=true'; if (project.hasProperty('mangogoatnapperManual')) vmArg '-Dmangogoatnapper.manual=true'; if (project.hasProperty('mangogoatnapperElevated')) vmArg '-Dmangogoatnapper.elevated=true'; if (project.hasProperty('mangogoatnapperWater')) vmArg '-Dmangogoatnapper.water=true' } } } }
+loom { runs { client { if (project.hasProperty('mangogoatnapperSmoke')) { vmArg '-Dmangogoatnapper.smoke=true'; if (project.hasProperty('mangogoatnapperManual')) vmArg '-Dmangogoatnapper.manual=true'; if (project.hasProperty('mangogoatnapperElevated')) vmArg '-Dmangogoatnapper.elevated=true'; if (project.hasProperty('mangogoatnapperWater')) vmArg '-Dmangogoatnapper.water=true'; if (project.hasProperty('mangogoatnapperUnderground')) vmArg '-Dmangogoatnapper.underground=true' } } } }
