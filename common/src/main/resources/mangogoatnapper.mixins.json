@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "package": "dev.mangogoatnapper.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "GoatRendererMixin",
+    "LyingPlayerRendererMixin",
+    "GoatRenderStateMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
