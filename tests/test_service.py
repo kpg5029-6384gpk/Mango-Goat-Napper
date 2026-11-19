@@ -17,6 +17,7 @@ async def test_local_feed_auth_and_reset():
         response = await client.get('/status', headers=headers)
         body = await response.json()
         assert body['status'] == 'Disconnected' and body['pets']['sequence'] == 0
+        assert body['cooldownSeconds'] == 300
         assert service.last_poll is not None
         service.feed.test()
         body = await (await client.get('/status', headers=headers)).json()

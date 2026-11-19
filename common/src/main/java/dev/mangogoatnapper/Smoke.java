@@ -21,7 +21,7 @@ final class Smoke {
   }
   if(mc.player==null || mc.level==null)return;
   worldTicks++;
-  if(worldTicks==30) { mc.gui.setScreen(null); inject(0); if(Boolean.getBoolean("mangogoatnapper.underground")) { var server=mc.getSingleplayerServer(); var id=mc.player.getUUID(); server.execute(()->testArena(server,id)); } }
+  if(worldTicks==30) { mc.gui.setScreen(null); inject(0); var server=mc.getSingleplayerServer(); var id=mc.player.getUUID(); server.execute(()->{ var p=server.getPlayerList().getPlayer(id); if(p!=null) MangoGoatNapper.testLavaLanding(p); if(Boolean.getBoolean("mangogoatnapper.underground")) testArena(server,id); }); }
   if(worldTicks==60) inject(1);
   if(goatSeen && MangoGoatNapper.testPhase()==1 && !Boolean.getBoolean("mangogoatnapper.elevated")) {
    chaseTicks++;

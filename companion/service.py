@@ -13,8 +13,9 @@ from core import normalize, backoff
 LOG = logging.getLogger('MangoGoatNapper')
 
 class Service:
-    def __init__(self, token):
+    def __init__(self, token, cooldown_seconds=300):
         self.token = token
+        self.cooldown_seconds = cooldown_seconds
         self.feed = PetGifts()
         self.status = 'Disconnected'
         self.message = ''
@@ -87,7 +88,7 @@ class Service:
             self.last_poll = time.monotonic()
             return web.json_response(dict(status=self.status, message=self.message,
                                           username=self.username, pets=self.feed.snapshot(),
-                                          lastGift=self.feed.last_result))
+                                          lastGift=self.feed.last_result, cooldownSeconds=self.cooldown_seconds))
         async def control(request):
             try:
                 data = await request.json()

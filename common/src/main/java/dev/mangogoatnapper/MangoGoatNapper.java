@@ -16,6 +16,7 @@ public final class MangoGoatNapper {
  private static final HttpClient HTTP=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
  private static volatile JsonObject feed=new JsonObject();
  private static volatile String status="Disconnected";
+ private static volatile int cooldownSeconds=300;
  private static String session="";
  private static long sequence, cooldownUntil;
  private static Mob goat;
@@ -40,6 +41,7 @@ public final class MangoGoatNapper {
    var response=HTTP.send(request,HttpResponse.BodyHandlers.ofString());
    if(response.statusCode()!=200)throw new IllegalStateException();
    var root=JsonParser.parseString(response.body()).getAsJsonObject(); status=root.get("status").getAsString(); feed=root.getAsJsonObject("pets");
+   if(root.has("cooldownSeconds")) { int value=root.get("cooldownSeconds").getAsInt(); if(value>=0 && value<=59999)cooldownSeconds=value; }
   } catch(Exception e) { status="Disconnected"; feed=new JsonObject(); }
  }
  static void tick() {
@@ -112,7 +114,7 @@ public final class MangoGoatNapper {
   candidate.finalizeSpawn(level,level.getCurrentDifficultyAt(candidate.blockPosition()),EntitySpawnReason.TRIGGERED,null);
   candidate.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE).setBaseValue(0); candidate.setPermanentlyInvulnerable(true); candidate.setSharedFlagOnFire(true);
   candidate.setCustomName(Component.literal("The Goat Napper")); candidate.setCustomNameVisible(true);
-  level.addFreshEntity(candidate); goat=candidate; target=playerId; phase=1; ticks=0; cooldownUntil=System.currentTimeMillis()+300000;
+  level.addFreshEntity(candidate); goat=candidate; target=playerId; phase=1; ticks=0; cooldownUntil=System.currentTimeMillis()+cooldownSeconds*1000L;
   player.sendSystemMessage(Component.literal("You hear a scream in the distance..."));
  }
  private static void advance(net.minecraft.server.MinecraftServer server, java.util.UUID playerId) {
@@ -158,13 +160,7 @@ public final class MangoGoatNapper {
     int y=level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,x,z);
     BlockPos pos=new BlockPos(x,y,z);
     var floor=level.getBlockState(pos.below());
-    if(!level.getWorldBorder().isWithinBounds(pos) || !safeFloor(floor) || !level.getBlockState(pos).isAir() || !level.getBlockState(pos.above()).isAir())continue;
-    boolean stable=true;
-    for(int dx=-1;dx<=1 && stable;dx++) for(int dz=-1;dz<=1;dz++) {
-     BlockPos nearby=pos.offset(dx,0,dz);
-     if(!safeFloor(level.getBlockState(nearby.below())) || !level.getBlockState(nearby).isAir() || !level.getBlockState(nearby.above()).isAir()) { stable=false; break; }
-    }
-    if(!stable)continue;
+    if(!safeDestination(level,pos))continue;
     destination=pos; moved=true; break search;
     }
    }
@@ -173,13 +169,25 @@ public final class MangoGoatNapper {
    phase=5; ticks=0;
   } else if(phase==5) {
    goat.setSharedFlagOnFire(true);
-   if(ticks%20==1)goat.getNavigation().moveTo(destination.getX()+0.5,destination.getY(),destination.getZ()+0.5,3.2);
-   if(goat.distanceToSqr(destination.getX()+0.5,destination.getY(),destination.getZ()+0.5)<9 || ticks>=240) {
+   // Do not carry a vulnerable passenger through lava en route. Recheck the
+   // landing immediately before moving them, since the world may have changed.
+   if(ticks>=1) {
+    if(!safeDestination(player.level(),destination)) { destination=null; phase=2; ticks=40; return; }
     player.stopRiding(); player.teleportTo(destination.getX()+0.5,destination.getY(),destination.getZ()+0.5);
     goat.discard(); goat=null; blackout=false;
     player.setPose(Pose.SLEEPING); player.sendSystemMessage(Component.literal("Press sneak to wake up.")); wakeArmed=false; phase=3; ticks=0;
    }
   } else if(phase==3) { if(!player.isShiftKeyDown())wakeArmed=true; if((wakeArmed && player.isShiftKeyDown()) || ticks>1200) { player.setPose(Pose.STANDING); cleanup(); } else { player.setPose(Pose.SLEEPING); } }
+ }
+ private static boolean safeDestination(net.minecraft.server.level.ServerLevel level,BlockPos pos) {
+  if(!level.getWorldBorder().isWithinBounds(pos))return false;
+  for(int dx=-4;dx<=4;dx++) for(int dz=-4;dz<=4;dz++) {
+   BlockPos nearby=pos.offset(dx,0,dz);
+   if(!level.hasChunk(nearby.getX()>>4,nearby.getZ()>>4))return false;
+   for(int dy=-2;dy<=3;dy++) if(level.getFluidState(nearby.offset(0,dy,0)).is(net.minecraft.tags.FluidTags.LAVA))return false;
+   if(Math.abs(dx)<=1 && Math.abs(dz)<=1 && (!safeFloor(level.getBlockState(nearby.below())) || !level.getBlockState(nearby).isAir() || !level.getBlockState(nearby.above()).isAir()))return false;
+  }
+  return true;
  }
  private static void prepareDestinations(net.minecraft.server.level.ServerPlayer player) {
   destinationCandidates.clear(); destinationLoads.clear();
@@ -201,6 +209,16 @@ public final class MangoGoatNapper {
  static int testPhase() { return phase; }
  static boolean testGoatHarmless() { return goat != null && goat.getRemainingFireTicks() <= 0 && goat.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE).getValue() == 0; }
  static void testBringGoat(net.minecraft.server.level.ServerPlayer player) { if(goat!=null)goat.setPos(player.getX(),player.getY(),player.getZ()+3); }
+ static void testLavaLanding(net.minecraft.server.level.ServerPlayer player) {
+  var level=player.level(); int x=(player.blockPosition().getX() & ~15)+8, z=(player.blockPosition().getZ() & ~15)+8, y=180;
+  for(int dx=-4;dx<=4;dx++) for(int dz=-4;dz<=4;dz++) for(int dy=-2;dy<=3;dy++)
+   level.setBlockAndUpdate(new BlockPos(x+dx,y+dy,z+dz),(dy==-1?net.minecraft.world.level.block.Blocks.STONE:net.minecraft.world.level.block.Blocks.AIR).defaultBlockState());
+  var pos=new BlockPos(x,y,z);
+  if(!safeDestination(level,pos))throw new AssertionError("Clear landing rejected");
+  level.setBlockAndUpdate(pos.offset(3,-1,0),net.minecraft.world.level.block.Blocks.LAVA.defaultBlockState());
+  if(safeDestination(level,pos))throw new AssertionError("Landing near lava accepted");
+  com.mojang.logging.LogUtils.getLogger().info("GOAT NAPPER LAVA LANDING PASSED");
+ }
  static void testUndergroundArena(net.minecraft.server.level.ServerPlayer player) {
   var level=player.level(); int x=player.blockPosition().getX(), z=player.blockPosition().getZ(), y=40;
   for(int dx=-45;dx<=45;dx++) for(int dz=-3;dz<=3;dz++) for(int h=0;h<=5;h++) {

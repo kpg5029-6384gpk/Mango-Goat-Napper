@@ -1,8 +1,8 @@
 # Mango Goat Napper
 
-Mango Goat Napper is a separate Minecraft Java 26.3 single-player mod and Windows companion. A completed TikTok LIVE Goat gift worth 200 coins triggers a flaming, screaming goat to appear roughly 30–50 blocks away and chase the player. It screams once, grabs the player, and carries them while the screen is black. The player wakes up lying down approximately 100–150 blocks from the starting point; press sneak to get up. A five-minute cooldown starts when the goat spawns.
+Mango Goat Napper is a separate Minecraft Java 26.3 single-player mod and Windows companion. A completed TikTok LIVE Goat gift worth 200 coins triggers a flaming, screaming goat to appear roughly 30–50 blocks away and chase the player. It screams once, grabs the player, and carries them while the screen is black. The player wakes up lying down approximately 100–150 blocks from the starting point; press sneak to get up. A configurable cooldown starts when the goat spawns; the default is five minutes.
 
-The goat's flames are visual only and its attack damage is zero. The mod attempts to navigate while carrying the player, then uses a safe-location teleport if it cannot complete the route within 12 seconds. It avoids several hazardous floors and searches for a clear landing, but unusual terrain and other mods can still prevent a safe destination. If no safe spot is found it ends the event. Gifts during an event or cooldown are dropped, not queued.
+The goat's flames are visual only and its attack damage is zero. After pickup and blackout, the mod moves the player directly to a checked landing spot, avoiding lava in and around it. It checks again immediately before moving the player. Unusual terrain and other mods can still affect safety. If no safe spot is found it ends the event. Gifts during an event or cooldown are dropped, not queued.
 
 ## Requirements
 
@@ -13,7 +13,7 @@ The goat's flames are visual only and its attack damage is zero. The mod attempt
 ## Play
 
 1. Install the appropriate JAR into the instance's `mods` folder. Fabric also requires Fabric API.
-2. Launch the companion, enter the creator's TikTok username or LIVE URL, and click Connect.
+2. Launch the companion, enter the creator's TikTok username or LIVE URL, and click Connect. Set the cooldown in minutes and seconds and click Save; changes apply to the next goat.
 3. Open a single-player world and wait for the companion to show Minecraft connected.
 4. Click **Test goat (no gift needed)** to test without a TikTok gift. A real gift requires a LIVE connection and a completed Goat gift.
 5. After relocation, release sneak if held, then press it to wake up. The mod also releases the pose after one minute as a fallback.
