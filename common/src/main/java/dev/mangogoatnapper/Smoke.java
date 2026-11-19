@@ -56,7 +56,7 @@ final class Smoke {
    server.execute(()->{
     var p=server.getPlayerList().getPlayer(id); if(p==null)return;
     int phase=MangoGoatNapper.testPhase();
-    if(phase==1 && !goatSeen) { if(!MangoGoatNapper.testGoatHarmless())throw new AssertionError("Goat must have visual fire only and zero attack damage"); goatSeen=true; if(Boolean.getBoolean("mangogoatnapper.elevated")) MangoGoatNapper.testElevatedArena(p); else MangoGoatNapper.testBringGoat(p); health=p.getHealth(); x=p.getX(); z=p.getZ(); }
+    if(phase==1 && !goatSeen) { if(!MangoGoatNapper.testGoatHarmless())throw new AssertionError("Goat must have visual fire only and zero attack damage"); goatSeen=true; if(Boolean.getBoolean("mangogoatnapper.water")) MangoGoatNapper.testWaterArena(p); else if(Boolean.getBoolean("mangogoatnapper.elevated")) MangoGoatNapper.testElevatedArena(p); else MangoGoatNapper.testBringGoat(p); health=p.getHealth(); x=p.getX(); z=p.getZ(); }
     if(phase==3 && !abducted) { abducted=true; if(p.getHealth()!=health || p.getRemainingFireTicks()>0)throw new AssertionError("Goat damaged or ignited player"); double distance=Math.hypot(p.getX()-x,p.getZ()-z); if(distance<99 || distance>152)throw new AssertionError("Wrong destination distance "+distance); LogUtils.getLogger().info("GOAT NAPPER SERVER POSE: {}",p.getPose()); }
     else if(abducted && phase==0 && !awakened) { awakened=true; LogUtils.getLogger().info("GOAT NAPPER SMOKE PASSED: spawn, capture, destination, wake");  }
    });

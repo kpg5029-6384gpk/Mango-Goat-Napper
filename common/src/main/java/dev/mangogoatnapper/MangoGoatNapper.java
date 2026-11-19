@@ -97,10 +97,16 @@ public final class MangoGoatNapper {
   ticks++;
   if(phase==1) {
    goat.setSharedFlagOnFire(true);
-   if(ticks%5==1)goat.getNavigation().moveTo(player,3.2);
+   if(ticks%5==1)goat.getNavigation().moveTo(player,3.7);
    // A goat can leap up to a nearby raised player when pathfinding alone stalls.
    double dx=player.getX()-goat.getX(), dz=player.getZ()-goat.getZ();
    double horizontal=Math.hypot(dx,dz);
+   // Land navigation struggles in water; swim directly toward the player while
+   // retaining normal collision physics and limiting vertical speed.
+   if(goat.isInWater() && horizontal>0.1) {
+    double dy=player.getY()-goat.getY();
+    goat.setDeltaMovement(dx/horizontal*0.42, Math.max(-0.12,Math.min(0.18,dy*0.12)), dz/horizontal*0.42);
+   }
    if(ticks%30==1 && goat.onGround() && horizontal>0.1 && horizontal<10 && player.getY()-goat.getY()>1.5 && player.getY()-goat.getY()<=5) {
     goat.setDeltaMovement(dx/horizontal*0.32,1.05,dz/horizontal*0.32);
    }
@@ -169,6 +175,14 @@ public final class MangoGoatNapper {
  static int testPhase() { return phase; }
  static boolean testGoatHarmless() { return goat != null && goat.getRemainingFireTicks() <= 0 && goat.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE).getValue() == 0; }
  static void testBringGoat(net.minecraft.server.level.ServerPlayer player) { if(goat!=null)goat.setPos(player.getX(),player.getY(),player.getZ()+3); }
+ static void testWaterArena(net.minecraft.server.level.ServerPlayer player) {
+  var level=player.level(); int x=player.blockPosition().getX(), z=player.blockPosition().getZ(), y=160;
+  for(int dx=-20;dx<=20;dx++) for(int dz=-5;dz<=5;dz++) {
+   level.setBlockAndUpdate(new BlockPos(x+dx,y,z+dz),net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
+   for(int h=1;h<=3;h++) level.setBlockAndUpdate(new BlockPos(x+dx,y+h,z+dz),net.minecraft.world.level.block.Blocks.WATER.defaultBlockState());
+  }
+  player.teleportTo(x+12.5,y+3,z+0.5); goat.setPos(x-12.5,y+2,z+0.5); goat.setDeltaMovement(0,0,0);
+ }
  static void testElevatedArena(net.minecraft.server.level.ServerPlayer player) {
   var level=player.level(); int x=player.blockPosition().getX(), z=player.blockPosition().getZ(), y=160;
   var stone=net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();

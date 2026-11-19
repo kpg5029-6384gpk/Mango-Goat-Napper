@@ -7,7 +7,7 @@ sourceSets.main.java.srcDir('../common/src/main/java')
 sourceSets.main.resources.srcDir('../common/src/main/resources')
 neoForge {
  version = project.neo_version
- runs { client { client(); if (project.hasProperty('mangogoatnapperSmoke')) { systemProperty 'mangogoatnapper.smoke', 'true'; if (project.hasProperty('mangogoatnapperManual')) systemProperty 'mangogoatnapper.manual', 'true'; if (project.hasProperty('mangogoatnapperElevated')) systemProperty 'mangogoatnapper.elevated', 'true' } } }
+ runs { client { client(); if (project.hasProperty('mangogoatnapperSmoke')) { systemProperty 'mangogoatnapper.smoke', 'true'; if (project.hasProperty('mangogoatnapperManual')) systemProperty 'mangogoatnapper.manual', 'true'; if (project.hasProperty('mangogoatnapperElevated')) systemProperty 'mangogoatnapper.elevated', 'true'; if (project.hasProperty('mangogoatnapperWater')) systemProperty 'mangogoatnapper.water', 'true' } } }
  mods { "${mod_id}" { sourceSet(sourceSets.main) } }
 }
 def metadata = tasks.register('generateModMetadata', ProcessResources) {
