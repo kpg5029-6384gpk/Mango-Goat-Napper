@@ -24,6 +24,7 @@ public final class MangoGoatNapper {
  private static volatile int phase;
  private static int ticks;
  private static boolean wakeArmed;
+ private static final StallTracker stall=new StallTracker();
  private static java.util.UUID target;
  private static BlockPos destination;
  private static double originX, originZ;
@@ -112,9 +113,10 @@ public final class MangoGoatNapper {
  }
  private static void spawnGoat(Mob candidate,java.util.UUID playerId,net.minecraft.server.level.ServerPlayer player,net.minecraft.server.level.ServerLevel level) {
   candidate.finalizeSpawn(level,level.getCurrentDifficultyAt(candidate.blockPosition()),EntitySpawnReason.TRIGGERED,null);
-  candidate.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE).setBaseValue(0); candidate.setPermanentlyInvulnerable(true); candidate.setSharedFlagOnFire(true);
+  candidate.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE).setBaseValue(0); candidate.setPermanentlyInvulnerable(true); visualFire(candidate);
   candidate.setCustomName(Component.literal("The Goat Napper")); candidate.setCustomNameVisible(true);
   level.addFreshEntity(candidate); goat=candidate; target=playerId; phase=1; ticks=0; cooldownUntil=System.currentTimeMillis()+cooldownSeconds*1000L;
+  stall.reset(player.getX(),player.getY(),player.getZ(),goat.distanceTo(player));
   player.sendSystemMessage(Component.literal("You hear a scream in the distance..."));
  }
  private static void advance(net.minecraft.server.MinecraftServer server, java.util.UUID playerId) {
@@ -124,7 +126,7 @@ public final class MangoGoatNapper {
   if((phase==2 || phase==4 || phase==5) && player.getVehicle()!=goat && !player.startRiding(goat,true,true)) { cleanup(); return; }
   ticks++;
   if(phase==1) {
-   goat.setSharedFlagOnFire(true);
+   visualFire(goat);
    if(ticks%5==1)goat.getNavigation().moveTo(player,3.7);
    // A goat can leap up to a nearby raised player when pathfinding alone stalls.
    double dx=player.getX()-goat.getX(), dz=player.getZ()-goat.getZ();
@@ -145,8 +147,18 @@ public final class MangoGoatNapper {
     prepareDestinations(player);
     phase=4; ticks=0;
    } else if(ticks>1200) { player.sendSystemMessage(Component.literal("The goat lost your trail.")); cleanup(); }
+   else if(goat.distanceTo(player)>4 && stall.update(player.getX(),player.getY(),player.getZ(),goat.distanceTo(player))) {
+    if(beginFallback(server,player)) { phase=6; ticks=0; }
+    else stall.reset(player.getX(),player.getY(),player.getZ(),goat.distanceTo(player));
+   }
+  } else if(phase==6) {
+   visualFire(goat);
+   if(ticks>=40) {
+    if(!player.startRiding(goat,true,true)) { cleanup(); return; }
+    prepareDestinations(player); phase=4; ticks=0;
+   }
   } else if(phase==4) {
-   goat.setSharedFlagOnFire(true);
+   visualFire(goat);
    if(ticks>=20) { blackout=true; phase=2; ticks=0; }
   } else if(phase==2 && ticks>=40 && ticks%10==0) {
    var level=player.level(); boolean moved=false;
@@ -168,7 +180,7 @@ public final class MangoGoatNapper {
    if(!moved) { player.stopRiding(); player.sendSystemMessage(Component.literal("Goat Napper: no safe destination found.")); cleanup(); return; }
    phase=5; ticks=0;
   } else if(phase==5) {
-   goat.setSharedFlagOnFire(true);
+   visualFire(goat);
    // Do not carry a vulnerable passenger through lava en route. Recheck the
    // landing immediately before moving them, since the world may have changed.
    if(ticks>=1) {
@@ -178,6 +190,33 @@ public final class MangoGoatNapper {
     player.setPose(Pose.SLEEPING); player.sendSystemMessage(Component.literal("Press sneak to wake up.")); wakeArmed=false; phase=3; ticks=0;
    }
   } else if(phase==3) { if(!player.isShiftKeyDown())wakeArmed=true; if((wakeArmed && player.isShiftKeyDown()) || ticks>1200) { player.setPose(Pose.STANDING); cleanup(); } else { player.setPose(Pose.SLEEPING); } }
+ }
+ private static void visualFire(Mob mob) { mob.setRemainingFireTicks(0); mob.setSharedFlagOnFire(true); }
+ private static boolean beginFallback(net.minecraft.server.MinecraftServer server,net.minecraft.server.level.ServerPlayer player) {
+  var level=player.level(); BlockPos playerPos=player.blockPosition();
+  for(int radius=2;radius<=4;radius++) for(int dx=-radius;dx<=radius;dx++) for(int dz=-radius;dz<=radius;dz++) {
+   if(Math.max(Math.abs(dx),Math.abs(dz))!=radius)continue;
+   for(int dy=-2;dy<=2;dy++) {
+    var pos=playerPos.offset(dx,dy,dz);
+    if(!safeDestination(level,pos))continue;
+    goat.getNavigation().stop(); goat.setPos(pos.getX()+0.5,pos.getY(),pos.getZ()+0.5); goat.setDeltaMovement(0,0,0);
+    fallbackScream(server,player); return true;
+   }
+  }
+  BlockPos goatPos=goat.blockPosition();
+  for(int radius=2;radius<=5;radius++) for(int dx=-radius;dx<=radius;dx++) for(int dz=-radius;dz<=radius;dz++) {
+   if(Math.max(Math.abs(dx),Math.abs(dz))!=radius)continue;
+   for(int dy=-2;dy<=2;dy++) {
+    var pos=goatPos.offset(dx,dy,dz);
+    if(!safeDestination(level,pos))continue;
+    goat.getNavigation().stop(); goat.setDeltaMovement(0,0,0); player.teleportTo(pos.getX()+0.5,pos.getY(),pos.getZ()+0.5);
+    fallbackScream(server,player); return true;
+   }
+  }
+  return false;
+ }
+ private static void fallbackScream(net.minecraft.server.MinecraftServer server,net.minecraft.server.level.ServerPlayer player) {
+  server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(),"execute at "+player.getStringUUID()+" run playsound mangogoatnapper:goat_scream hostile @a ~ ~ ~ 1 0.85 1");
  }
  private static boolean safeDestination(net.minecraft.server.level.ServerLevel level,BlockPos pos) {
   if(!level.getWorldBorder().isWithinBounds(pos))return false;
@@ -217,6 +256,7 @@ public final class MangoGoatNapper {
   if(!safeDestination(level,pos))throw new AssertionError("Clear landing rejected");
   level.setBlockAndUpdate(pos.offset(3,-1,0),net.minecraft.world.level.block.Blocks.LAVA.defaultBlockState());
   if(safeDestination(level,pos))throw new AssertionError("Landing near lava accepted");
+  level.setBlockAndUpdate(pos.offset(3,-1,0),net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
   com.mojang.logging.LogUtils.getLogger().info("GOAT NAPPER LAVA LANDING PASSED");
  }
  static void testUndergroundArena(net.minecraft.server.level.ServerPlayer player) {
@@ -241,6 +281,13 @@ public final class MangoGoatNapper {
   for(int dx=-8;dx<=8;dx++) for(int dz=-8;dz<=8;dz++) level.setBlockAndUpdate(new BlockPos(x+dx,y,z+dz),stone);
   for(int dx=-2;dx<=2;dx++) for(int dz=-2;dz<=2;dz++) level.setBlockAndUpdate(new BlockPos(x+dx,y+4,z+dz),stone);
   player.teleportTo(x+0.5,y+5,z+0.5); goat.setPos(x+6.5,y+1,z+0.5); goat.setDeltaMovement(0,0,0);
+ }
+ static void testPillarArena(net.minecraft.server.level.ServerPlayer player) {
+  var level=player.level(); int x=player.blockPosition().getX(), z=player.blockPosition().getZ(), y=160;
+  var stone=net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
+  for(int dx=-9;dx<=9;dx++) for(int dz=-9;dz<=9;dz++) level.setBlockAndUpdate(new BlockPos(x+dx,y,z+dz),stone);
+  for(int h=1;h<=10;h++) level.setBlockAndUpdate(new BlockPos(x,y+h,z),stone);
+  player.teleportTo(x+0.5,y+11,z+0.5); goat.setPos(x+7.5,y+1,z+0.5); goat.setDeltaMovement(0,0,0);
  }
 
  private static boolean safeFloor(net.minecraft.world.level.block.state.BlockState floor) {

@@ -12,11 +12,12 @@ import net.minecraft.world.level.levelgen.presets.WorldPresets;
 /** Opt-in synthetic end-to-end check in a new isolated development world. */
 final class Smoke {
  static int ticks, worldTicks, poseTicks, wakeTicks, grabTicks, chaseTicks; static volatile boolean started, goatSeen, abducted, awakened; static double x,z; static float health;
+ static boolean fallbackSeen;
  static void tick() {
   var mc=Minecraft.getInstance(); ticks++; mc.options.pauseOnLostFocus=false;
   if(!started && ticks>=100) {
    started=true;
-   var settings=new LevelSettings("Goat Napper QA",GameType.CREATIVE,new LevelSettings.DifficultySettings(Difficulty.PEACEFUL,false,false),true,WorldDataConfiguration.DEFAULT);
+   var settings=new LevelSettings("Goat Napper QA",Boolean.getBoolean("mangogoatnapper.pillar")?GameType.SURVIVAL:GameType.CREATIVE,new LevelSettings.DifficultySettings(Difficulty.PEACEFUL,false,false),true,WorldDataConfiguration.DEFAULT);
    mc.createWorldOpenFlows().createFreshLevel("goatnapper-qa-"+System.currentTimeMillis(),settings,new WorldOptions(42L,false,false),WorldPresets::createNormalWorldDimensions,mc.gui.screen()); return;
   }
   if(mc.player==null || mc.level==null)return;
@@ -55,9 +56,11 @@ final class Smoke {
    var server=mc.getSingleplayerServer(); var id=mc.player.getUUID();
    server.execute(()->{
     var p=server.getPlayerList().getPlayer(id); if(p==null)return;
+    if(goatSeen && !abducted && (p.getRemainingFireTicks()>0 || p.getHealth()<health))throw new AssertionError("Player ignited or damaged during goat encounter");
     int phase=MangoGoatNapper.testPhase();
-    if(phase==1 && !goatSeen) { if(!MangoGoatNapper.testGoatHarmless())throw new AssertionError("Goat must have visual fire only and zero attack damage"); goatSeen=true; if(Boolean.getBoolean("mangogoatnapper.water")) MangoGoatNapper.testWaterArena(p); else if(Boolean.getBoolean("mangogoatnapper.elevated")) MangoGoatNapper.testElevatedArena(p); else if(!Boolean.getBoolean("mangogoatnapper.underground")) MangoGoatNapper.testBringGoat(p); health=p.getHealth(); x=p.getX(); z=p.getZ(); }
-    if(phase==3 && !abducted) { abducted=true; if(p.getHealth()!=health || p.getRemainingFireTicks()>0)throw new AssertionError("Goat damaged or ignited player"); double distance=Math.hypot(p.getX()-x,p.getZ()-z); if(distance<99 || distance>152)throw new AssertionError("Wrong destination distance "+distance); LogUtils.getLogger().info("GOAT NAPPER SERVER POSE: {}",p.getPose()); }
+    if(phase==1 && !goatSeen) { if(!MangoGoatNapper.testGoatHarmless())throw new AssertionError("Goat must have visual fire only and zero attack damage"); goatSeen=true; if(Boolean.getBoolean("mangogoatnapper.pillar")) MangoGoatNapper.testPillarArena(p); else if(Boolean.getBoolean("mangogoatnapper.water")) MangoGoatNapper.testWaterArena(p); else if(Boolean.getBoolean("mangogoatnapper.elevated")) MangoGoatNapper.testElevatedArena(p); else if(!Boolean.getBoolean("mangogoatnapper.underground")) MangoGoatNapper.testBringGoat(p); health=p.getHealth(); x=p.getX(); z=p.getZ(); }
+    if(phase==6 && !fallbackSeen) { fallbackSeen=true; x=p.getX(); z=p.getZ(); LogUtils.getLogger().info("GOAT NAPPER STUCK FALLBACK PASSED"); }
+    if(phase==3 && !abducted) { abducted=true; if(Boolean.getBoolean("mangogoatnapper.pillar") && !fallbackSeen)throw new AssertionError("Pillar fallback was not triggered"); if(p.getHealth()!=health || p.getRemainingFireTicks()>0)throw new AssertionError("Goat damaged or ignited player"); double distance=Math.hypot(p.getX()-x,p.getZ()-z); if(distance<99 || distance>152)throw new AssertionError("Wrong destination distance "+distance); LogUtils.getLogger().info("GOAT NAPPER SERVER POSE: {}",p.getPose()); }
     else if(abducted && phase==0 && !awakened) { awakened=true; LogUtils.getLogger().info("GOAT NAPPER SMOKE PASSED: spawn, capture, destination, wake");  }
    });
   }

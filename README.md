@@ -2,7 +2,7 @@
 
 Mango Goat Napper is a separate Minecraft Java 26.3 single-player mod and Windows companion. A completed TikTok LIVE Goat gift worth 200 coins triggers a flaming, screaming goat to appear roughly 30–50 blocks away and chase the player. It screams once, grabs the player, and carries them while the screen is black. The player wakes up lying down approximately 100–150 blocks from the starting point; press sneak to get up. A configurable cooldown starts when the goat spawns; the default is five minutes.
 
-The goat's flames are visual only and its attack damage is zero. After pickup and blackout, the mod moves the player directly to a checked landing spot, avoiding lava in and around it. It checks again immediately before moving the player. Unusual terrain and other mods can still affect safety. If no safe spot is found it ends the event. Gifts during an event or cooldown are dropped, not queued.
+If the player remains within about three blocks for eight seconds and the goat cannot close the gap, the goat teleports to a safe nearby spot. If that is impossible, the player is moved to a safe spot near the goat. The goat screams, waits two seconds, and grabs the player. If neither spot is safe, the chase continues. Players who keep moving can escape; the chase ends after 60 seconds. The goat's flames are visual only and its attack damage is zero. After pickup and blackout, the mod moves the player directly to a checked landing spot, avoiding lava in and around it. It checks again immediately before moving the player. Unusual terrain and other mods can still affect safety. If no safe spot is found it ends the event. Gifts during an event or cooldown are dropped, not queued.
 
 ## Requirements
 
